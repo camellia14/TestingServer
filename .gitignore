@@ -1,0 +1,21 @@
+## Compiled source #
+*.com
+*.class
+*.dll
+*.lib
+*.exe
+*.out
+*.ilk
+*.o
+*.pdb
+*.so
+*.idb
+*.log
+*.vs
+*.sql
+*.sqlite
+/x64
+/TestingServer/x64
+
+
+
