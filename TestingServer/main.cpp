@@ -1,4 +1,4 @@
-#include <iostream>
+ï»¿#include <iostream>
 #include <vector>
 #include <map>
 #include <set>
@@ -62,7 +62,7 @@ std::vector<int> indices = {
 	18, 19, 24,	//23
 	24, 23, 18,	//24
 };
-typedef std::vector<int> Wall;
+typedef Line Wall;
 typedef std::vector<Wall> Walls;
 typedef std::vector<int> Path;
 
@@ -72,45 +72,28 @@ static int OuterProduct(const Vector3<T>& v1, const Vector3<T>& v2)
 	return v1.x * v2.y - v1.y * v2.x;
 }
 class ConvexPolygon;
-// —×Úî•ñ
+// éš£æ¥æƒ…å ±
 class AdjacentData
 {
 public:
 	Wall wall;
 	ConvexPolygon* neighbour_polygon = nullptr;
 };
-// ü•ª
-class Line
-{
-public:
-	Line() {}
-	Line(int i1, int i2) : indices({ i1, i2 }) {}
-	std::vector<int> indices;
-	bool operator==(const Line& v) const
-	{
-		if (indices.size() != v.indices.size()) return false;
-		for (int i = 0; i < indices.size(); i++)
-		{
-			if (indices[i] != v.indices[i]) return false;
-		}
-		return true;
-	}
-};
-// OŠpŒ`‚ğ‡”Ô‚É‚Â‚È‚°‚ÄA‰š‚İ‚ª–³‚¢ŠÔ‚Í‚¸‚Á‚Æ‚Ğ‚Æ‚Ü‚Æ‚ß‚É‚µ‘±‚¯‚é
+// ä¸‰è§’å½¢ã‚’é †ç•ªã«ã¤ãªã’ã¦ã€å‡¹ã¿ãŒç„¡ã„é–“ã¯ãšã£ã¨ã²ã¨ã¾ã¨ã‚ã«ã—ç¶šã‘ã‚‹
 class ConvexPolygon
 {
 public:
 	int current_index;
 	int prev_path_index;
-	std::vector<int> indices;
+	std::vector<Vector3<int>> vertices;
 	std::vector<Line> lines;
 	std::vector<AdjacentData> adjacents;
 	Vector3<int> center_pos;
-	int cost = 0; // ‚±‚±‚Ü‚ÅÅ’Z‡ŒvƒRƒXƒg
-	int heuristic_cost = 0; // ƒS[ƒ‹‚Ü‚Å‚Ì—\‘ªƒRƒXƒgi‹——£j
+	int cost = 0; // ã“ã“ã¾ã§æœ€çŸ­åˆè¨ˆã‚³ã‚¹ãƒˆ
+	int heuristic_cost = 0; // ã‚´ãƒ¼ãƒ«ã¾ã§ã®äºˆæ¸¬ã‚³ã‚¹ãƒˆï¼ˆè·é›¢ï¼‰
 	bool operator==(const ConvexPolygon& v) const
 	{
-		return indices == v.indices;
+		return vertices == v.vertices;
 	}
 	bool IsAdjacent(const ConvexPolygon& v)
 	{
@@ -118,13 +101,8 @@ public:
 		{
 			for (auto&& vline : v.lines)
 			{
-				//if ((line.indices[0] == vline.indices[0] && line.indices[1] == vline.indices[1]) ||
-				//	(line.indices[0] == vline.indices[1] && line.indices[1] == vline.indices[0]))
-				//{
-				//	return true;
-				//}
-				if ((line.indices[0] == vline.indices[0] && line.indices[1] == vline.indices[1]) ||
-					(line.indices[0] == vline.indices[1] && line.indices[1] == vline.indices[0]))
+				if ((line[0] == vline[0] && line[1] == vline[1]) ||
+					(line[0] == vline[1] && line[1] == vline[0]))
 				{
 					return true;
 				}
@@ -132,26 +110,26 @@ public:
 		}
 		return false;
 	}
-	Wall GetAdjacentWall(const ConvexPolygon& v)
+	Line GetAdjacentWall(const ConvexPolygon& v)
 	{
 		for (auto&& line : lines)
 		{
 			for (auto&& vline : v.lines)
 			{
-				if ((line.indices[0] == vline.indices[0] && line.indices[1] == vline.indices[1]) ||
-					(line.indices[0] == vline.indices[1] && line.indices[1] == vline.indices[0]))
+				if ((line[0] == vline[0] && line[1] == vline[1]) ||
+					(line[0] == vline[1] && line[1] == vline[0]))
 				{
-					return Wall(line.indices);
+					return line;
 				}
 			}
 		}
-		return Wall();
+		return Line();
 	}
 	bool IsPointInPolygon(const Vector3<int>& pos) const
 	{
-		for (int i = 0; i < indices.size(); i++) {
-			int next = (i + 1) % indices.size();
-			if (OuterProduct(vertices[indices[i]] - vertices[indices[next]], vertices[indices[i]] - pos) < 0) {
+		for (int i = 0; i < vertices.size(); i++) {
+			int next = (i + 1) % vertices.size();
+			if (OuterProduct(vertices[i] - vertices[next], vertices[i] - pos) < 0) {
 				return false;
 			}
 		}
@@ -166,7 +144,7 @@ public:
 	std::map<int, std::map<int, int>> routings;
 };
 
-// —×Úî•ñ‚ğİ’è‚·‚éB
+// éš£æ¥æƒ…å ±ã‚’è¨­å®šã™ã‚‹ã€‚
 Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
 {
 	Walls walls;
@@ -189,7 +167,7 @@ Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
 	return walls;
 }
 
-// “ÊW‡‚©
+// å‡¸é›†åˆã‹
 bool IsConvexSet(const std::vector<Line>& lines)
 {
 	if (lines.size() < 3) return false;
@@ -197,12 +175,12 @@ bool IsConvexSet(const std::vector<Line>& lines)
 	{
 		auto&& line1 = lines[i];
 		auto&& line2 = lines[(i + 1) % lines.size()];
-		Vector3<int> p1 = vertices[line1.indices[0]];
-		Vector3<int> p2 = vertices[line1.indices[1]];
-		Vector3<int> p3 = vertices[line2.indices[0]];
-		Vector3<int> p4 = vertices[line2.indices[1]];
-		auto&& vector1 = p2 - p1;
-		auto&& vector2 = p4 - p3;
+		Vector3<int> p1 = line1[0];
+		Vector3<int> p2 = line1[1];
+		Vector3<int> p3 = line2[0];
+		Vector3<int> p4 = line2[1];
+		auto&& vector1 = line1.GetVector();
+		auto&& vector2 = line2.GetVector();
 		//std::cout
 		//	<< " p1:(" << p1.x << "," << p1.y << ")"
 		//	<< " p2:(" << p2.x << "," << p2.y << ")"
@@ -223,15 +201,15 @@ std::vector<Line> CreateLines(std::vector<Line> line1, std::vector<Line> line2)
 {
 	int insert_index = -1;
 	bool is_adjacent = false;
-	// insert‚·‚é‚×‚«êŠ‚ğ‹‚ß‚é
+	// insertã™ã‚‹ã¹ãå ´æ‰€ã‚’æ±‚ã‚ã‚‹
 	for (int i = 0; i < line1.size(); i++)
 	{
-		// line1‚Ì‚à‚Ì‚ªline2‚Ì’†‚É‚ ‚é‚©H
+		// line1ã®ã‚‚ã®ãŒline2ã®ä¸­ã«ã‚ã‚‹ã‹ï¼Ÿ
 		Line& line = line1[i];
 		for (auto&& it = line2.begin(); it != line2.end(); it++)
 		{
-			if (line1[i].indices[0] == it->indices[1] &&
-				line1[i].indices[1] == it->indices[0])
+			if (line1[i][0] == (*it)[1] &&
+				line1[i][1] == (*it)[0])
 			{
 				is_adjacent = true;
 				line1.erase(line1.begin() + i);
@@ -250,14 +228,14 @@ std::vector<Line> CreateLines(std::vector<Line> line1, std::vector<Line> line2)
 		line1.insert(line1.begin() + insert_index, line2.begin(), line2.end());
 	}
 	if (false == is_adjacent) return {};
-	// •À‚Ñ•Ï‚¦
+	// ä¸¦ã³å¤‰ãˆ
 	for (int i = 0; i < line1.size() - 1; i++)
 	{
 		for (int j = i + 1; j < line1.size(); j++)
 		{
-			if (line1[i].indices[1] == line1[j].indices[0])
+			if (line1[i][1] == line1[j][0])
 			{
-				if (i + 1 == j) break;//swap–³‚µ
+				if (i + 1 == j) break;//swapç„¡ã—
 				auto temp = line1[i + 1];
 				line1[i + 1] = line1[j];
 				line1[j] = temp;
@@ -267,31 +245,30 @@ std::vector<Line> CreateLines(std::vector<Line> line1, std::vector<Line> line2)
 	}
 	return line1;
 }
-// “ÊW‡ƒ|ƒŠƒSƒ“‚ÌƒŠƒXƒg‚ğƒZƒbƒgƒAƒbƒv‚·‚éiˆê“x‚ÅŠ®‘S‚Èó‘Ô‚É‚Í‚È‚ç‚È‚¢j
+// å‡¸é›†åˆãƒãƒªã‚´ãƒ³ã®ãƒªã‚¹ãƒˆã‚’ã‚»ãƒƒãƒˆã‚¢ãƒƒãƒ—ã™ã‚‹ï¼ˆä¸€åº¦ã§å®Œå…¨ãªçŠ¶æ…‹ã«ã¯ãªã‚‰ãªã„ï¼‰
 int SetupConvexSet(std::vector<ConvexPolygon>& polygons)
 {
 	int combine_count = 0;
 	std::vector<ConvexPolygon> combine_polygons;
 	for (int i = 0; i < polygons.size(); i++)
 	{
-		if (polygons[i].indices.size() == 0) continue;
+		if (polygons[i].vertices.size() == 0) continue;
 		ConvexPolygon convex_polygon = polygons[i];
 		for (int j = i + 1; j < polygons.size(); j++)
 		{
-			if (polygons[j].indices.size() == 0) continue;
+			if (polygons[j].vertices.size() == 0) continue;
 
 			auto&& combine_lines = CreateLines(convex_polygon.lines, polygons[j].lines);
 			if (IsConvexSet(combine_lines))
 			{
 				combine_count++;
-				convex_polygon.indices.clear();
+				convex_polygon.vertices.clear();
 				for (auto&& line : combine_lines) {
-					convex_polygon.indices.emplace_back(line.indices[0]);
+					convex_polygon.vertices.emplace_back(line[0]);
 				}
 				convex_polygon.lines = combine_lines;
 
-				polygons[j].indices.clear();
-				//std::cout << "Combine " << i << " <- " << j << std::endl;
+				polygons[j].vertices.clear();
 			}
 		}
 		combine_polygons.emplace_back(convex_polygon);
@@ -321,7 +298,7 @@ Path_ PathFind(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons
 {
 	Path_ path(current_index, goal_index);
 	ConvexPolygon* target_polygon = nullptr;
-	// ƒRƒXƒg‚ğƒŠƒZƒbƒg‚·‚é
+	// ã‚³ã‚¹ãƒˆã‚’ãƒªã‚»ãƒƒãƒˆã™ã‚‹
 	for (int i = 0; i < polygons.size(); i++)
 	{
 		polygons[i].cost = INT_MAX;
@@ -332,7 +309,7 @@ Path_ PathFind(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons
 		}
 	}
 	if (target_polygon == nullptr) return path; // invalid argument
-	// ƒRƒXƒgŒvZ‚·‚é
+	// ã‚³ã‚¹ãƒˆè¨ˆç®—ã™ã‚‹
 	std::vector<int> open_list, close_list;
 	open_list.emplace_back(current_index);
 	polygons[current_index].cost = 0;
@@ -344,18 +321,18 @@ Path_ PathFind(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons
 		for (auto&& adjacent : polygons[index].adjacents)
 		{
 			auto target = adjacent.neighbour_polygon;
-			// —×Úƒm[ƒh‚ğƒ`ƒFƒbƒN‚·‚é
+			// éš£æ¥ãƒãƒ¼ãƒ‰ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹
 			auto&& it = std::find(close_list.begin(), close_list.end(), target->current_index);
-			if (it != close_list.end()) continue;// ‚·‚Å‚ÉƒNƒ[ƒYÏ‚İ
-			// ƒqƒ…[ƒŠƒXƒeƒBƒbƒNƒRƒXƒg‚ğŒvZ
+			if (it != close_list.end()) continue;// ã™ã§ã«ã‚¯ãƒ­ãƒ¼ã‚ºæ¸ˆã¿
+			// ãƒ’ãƒ¥ãƒ¼ãƒªã‚¹ãƒ†ã‚£ãƒƒã‚¯ã‚³ã‚¹ãƒˆã‚’è¨ˆç®—
 			if (target->heuristic_cost == -1)
 			{
 				target->heuristic_cost = CalcSqDistance(target->center_pos, polygons[goal_index].center_pos);
 			}
 			int edge_cost = CalcSqDistance(target->center_pos, polygons[index].center_pos);
 			int cost = polygons[index].cost + edge_cost + target->heuristic_cost;
-			// ‡ŒvƒRƒXƒg‚Ì”äŠr
-			if (target->cost < cost) continue; // ƒRƒXƒgXV‚È‚ç‚¸
+			// åˆè¨ˆã‚³ã‚¹ãƒˆã®æ¯”è¼ƒ
+			if (target->cost < cost) continue; // ã‚³ã‚¹ãƒˆæ›´æ–°ãªã‚‰ãš
 			target->cost = cost;
 			open_list.emplace_back(target->current_index);
 			target->prev_path_index = index;
@@ -367,7 +344,7 @@ Path_ PathFind(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons
 		close_list.emplace_back(index);
 	}
 	//std::cout << "Start:" << current_index << ", Goal:" << goal_index << std::endl;
-	// ‹t‡‚Éƒ`ƒFƒbƒN‚µ‚Äƒ‹[ƒg‚ğŠm’è‚·‚éiŒo˜Hƒe[ƒuƒ‹‚É”½‰f‚·‚éj
+	// é€†é †ã«ãƒã‚§ãƒƒã‚¯ã—ã¦ãƒ«ãƒ¼ãƒˆã‚’ç¢ºå®šã™ã‚‹ï¼ˆçµŒè·¯ãƒ†ãƒ¼ãƒ–ãƒ«ã«åæ˜ ã™ã‚‹ï¼‰
 	ConvexPolygon* p = target_polygon;
 	while (p)
 	{
@@ -395,9 +372,9 @@ RoutingTable CreateRoutingTable(std::vector<ConvexPolygon>& polygons)
 	{
 		for (int j = 0; j < polygons.size(); j++)
 		{
-			if (i == j) continue;//“¯‚¶ƒm[ƒh‚É‘Î‚µ‚Ä‚ÍÈ—ª
-			if (routing_table.routings[i][j] != -1) continue;//’TõÏ‚İ‚È‚çÈ—ª
-			// Œo˜H’Tõ
+			if (i == j) continue;//åŒã˜ãƒãƒ¼ãƒ‰ã«å¯¾ã—ã¦ã¯çœç•¥
+			if (routing_table.routings[i][j] != -1) continue;//æ¢ç´¢æ¸ˆã¿ãªã‚‰çœç•¥
+			// çµŒè·¯æ¢ç´¢
 			PathFind(routing_table, polygons, i, j);
 		}
 	}
@@ -410,7 +387,7 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 	int goal = GetIndex(polygons, Vector3<int>(30, 120, 0));
 	auto&& path = PathFind(routing_table, polygons, start, goal);
 	Vector3<int> next;
-	// ƒS[ƒ‹‚Ü‚Å’¼ü“I‚És‚¯‚é‚©H
+	// ã‚´ãƒ¼ãƒ«ã¾ã§ç›´ç·šçš„ã«è¡Œã‘ã‚‹ã‹ï¼Ÿ
 
 
 	return next;
@@ -425,32 +402,17 @@ void OutputIndex(std::vector<ConvexPolygon>& polygons, const Vector3<int>& searc
 int main()
 {
 	std::cout << "Testing Server" << std::endl;
-	//{
-	//	Vector3<int> p1(40, 80, 0), p2(20, 80, 0), p3(20, 20, 0);
-	//	int result = OuterProduct(p2 - p1, p3 - p2);
-	//	std::cout << "result:" << result << std::endl;
-	//}
-	//{
-	//	Vector3<int> p1(20, 20, 0), p2(20, 80, 0), p3(40, 80, 0);
-	//	int result = OuterProduct(p2 - p1, p3 - p2);
-	//	std::cout << "result:" << result << std::endl;
-	//}
-	if (indices.size() % 3 != 0)
-	{
-		std::cout << "indices.size:" << indices.size () << std::endl;
-		return 0;
-	}
-	// OŠpŒ`‚Ìƒ|ƒŠƒSƒ“‚ğƒŠƒXƒgƒAƒbƒv‚·‚é
+	// ä¸‰è§’å½¢ã®ãƒãƒªã‚´ãƒ³ã‚’ãƒªã‚¹ãƒˆã‚¢ãƒƒãƒ—ã™ã‚‹
 	std::vector<ConvexPolygon> polygons;
 	for (int i = 0; i < indices.size();)
 	{
 		ConvexPolygon polygon;
-		polygon.indices.emplace_back(indices[i++]);
-		polygon.indices.emplace_back(indices[i++]);
-		polygon.indices.emplace_back(indices[i++]);
-		polygon.lines.emplace_back(polygon.indices[0], polygon.indices[1]);
-		polygon.lines.emplace_back(polygon.indices[1], polygon.indices[2]);
-		polygon.lines.emplace_back(polygon.indices[2], polygon.indices[0]);
+		polygon.vertices.emplace_back(vertices[indices[i++]]);
+		polygon.vertices.emplace_back(vertices[indices[i++]]);
+		polygon.vertices.emplace_back(vertices[indices[i++]]);
+		polygon.lines.emplace_back(polygon.vertices[0], polygon.vertices[1]);
+		polygon.lines.emplace_back(polygon.vertices[1], polygon.vertices[2]);
+		polygon.lines.emplace_back(polygon.vertices[2], polygon.vertices[0]);
 		polygons.emplace_back(polygon);
 	}
 	//std::cout << "------------------------------------------" << std::endl;
@@ -467,33 +429,21 @@ int main()
 	//}
 	std::cout << "------------------------------------------" << std::endl;
 	std::cout << "* Combine" << std::endl;
-	// “ÊW‡ƒŠƒXƒg‚ğì¬
+	// å‡¸é›†åˆãƒªã‚¹ãƒˆã‚’ä½œæˆ
 	int conbine_num = SetupConvexSet(polygons);
-	while (conbine_num > 0)// ‡¬‚µ‚È‚­‚È‚é‚Ü‚ÅŒJ‚è•Ô‚·
+	while (conbine_num > 0)// åˆæˆã—ãªããªã‚‹ã¾ã§ç¹°ã‚Šè¿”ã™
 	{
 		conbine_num = SetupConvexSet(polygons);
 	}
-	// Œ‹‡
+	// çµåˆ
 	std::cout << "polygons.size:" << polygons.size() << std::endl;
 	for (int i = 0; i < polygons.size(); i++)
 	{
-		// dS“_‚Æ‚©‚É‚µ‚½‚¢B
-		polygons[i].center_pos = vertices[polygons[i].indices[0]];
-
-		std::cout << "Index:";
+		polygons[i].center_pos = polygons[i].vertices[0];
 		polygons[i].current_index = i;
-		for (int index : polygons[i].indices)
-		{
-			std::cout << index << ", ";
-		}
-		std::cout << std::endl;
 	}
-	//for (auto&& wall : walls)
-	//{
-	//	std::cout << "Wall:" << wall[0] << ", " << wall[1] << std::endl;
-	//}
 	
-	// ‡B—×Ú‚·‚éƒ|ƒŠƒSƒ“‚Æ‚ÌÚ“_ƒCƒ“ƒfƒbƒNƒX‚ğ•Û‚·‚é
+	// â‘¢éš£æ¥ã™ã‚‹ãƒãƒªã‚´ãƒ³ã¨ã®æ¥ç‚¹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’ä¿æŒã™ã‚‹
 	MakeUpAdjacentData(polygons);
 	//for (int i = 0; i < polygons.size(); i++)
 	//{
@@ -507,9 +457,9 @@ int main()
 	//	}
 	//}
 	
-	// ‡Cƒ|ƒŠƒSƒ“‘“–‚½‚èŒo˜H’Tõ‚ğs‚Á‚ÄŒo˜Hƒe[ƒuƒ‹‚ğì‚éB
+	// â‘£ãƒãƒªã‚´ãƒ³ç·å½“ãŸã‚ŠçµŒè·¯æ¢ç´¢ã‚’è¡Œã£ã¦çµŒè·¯ãƒ†ãƒ¼ãƒ–ãƒ«ã‚’ä½œã‚‹ã€‚
 	auto&& routing_table = CreateRoutingTable(polygons);
-	// Œo˜Hƒe[ƒuƒ‹•\¦
+	// çµŒè·¯ãƒ†ãƒ¼ãƒ–ãƒ«è¡¨ç¤º
 	//for (int i = 0; i < routing_table.routings.size(); i++)
 	//{
 	//	for (int j = 0; j < routing_table.routings[i].size(); j++)
@@ -520,8 +470,8 @@ int main()
 	//	}
 	//}
 
-	// ‡D–Ú“IÀ•W‚ğŒ³‚ÉŸ‚És‚­‚×‚«À•W‚ğŒˆ’è‚·‚éB
-	// ’¼ü“I‚ÉˆÚ“®‚Å‚«‚é‚©ƒ`ƒFƒbƒN¨•Ç‚ÌŒğ·”»’è
+	// â‘¤ç›®çš„åº§æ¨™ã‚’å…ƒã«æ¬¡ã«è¡Œãã¹ãåº§æ¨™ã‚’æ±ºå®šã™ã‚‹ã€‚
+	// ç›´ç·šçš„ã«ç§»å‹•ã§ãã‚‹ã‹ãƒã‚§ãƒƒã‚¯â†’å£ã®äº¤å·®åˆ¤å®š
 	OutputIndex(polygons, Vector3<int>(10, 10, 0));
 	OutputIndex(polygons, Vector3<int>(30, 30, 0));
 	OutputIndex(polygons, Vector3<int>(130, 50, 0));

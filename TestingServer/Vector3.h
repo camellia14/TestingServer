@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 template <typename T>
 class Vector3
@@ -8,35 +8,35 @@ public:
 	Vector3() {}
 	Vector3(T x, T y, T z) :x(x), y(y), z(z) {}
 
-	Vector3<T> operator +(Vector3<T> v)
+	Vector3<T> operator +(Vector3<T> v) const
 	{
 		return Vector3<T>(x + v.x, y + v.y, z + v.z);
 	}
-	Vector3<T> operator -(Vector3<T> v)
+	Vector3<T> operator -(Vector3<T> v) const
 	{
 		return Vector3<T>(x - v.x, y - v.y, z - v.z);
 	}
-	Vector3<T> operator *(Vector3<T> v)
+	Vector3<T> operator *(Vector3<T> v) const
 	{
 		return Vector3<T>(x * v.x, y * v.y, z * v.z);
 	}
-	Vector3<T> operator /(Vector3<T> v)
+	Vector3<T> operator /(Vector3<T> v) const
 	{
 		return Vector3<T>(x / v.x, y / v.y, z / v.z);
 	}
-	Vector3<T> operator +(T v)
+	Vector3<T> operator +(T v) const
 	{
 		return Vector3<T>(x + v, y + v, z + v);
 	}
-	Vector3<T> operator -(T v)
+	Vector3<T> operator -(T v) const
 	{
 		return Vector3<T>(x - v, y - v, z - v);
 	}
-	Vector3<T> operator *(T v)
+	Vector3<T> operator *(T v) const
 	{
 		return Vector3<T>(x * v, y * v, z * v);
 	}
-	Vector3<T> operator /(T v)
+	Vector3<T> operator /(T v) const
 	{
 		return Vector3<T>(x / v, y / v, z / v);
 	}
