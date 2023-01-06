@@ -64,7 +64,6 @@ std::vector<int> indices = {
 };
 typedef Line Wall;
 typedef std::vector<Wall> Walls;
-typedef std::vector<int> Path;
 
 class ConvexPolygon;
 // 隣接情報
@@ -138,7 +137,69 @@ public:
 	//current_index, goal_index, next_index
 	std::map<int, std::map<int, int>> routings;
 	std::map<int, int>& operator[](int i) { return routings[i]; }
-	
+	Path PathFind(std::vector<ConvexPolygon>& polygons, int current_index, int goal_index)
+	{
+		Path path(current_index, goal_index);
+		ConvexPolygon* target_polygon = nullptr;
+		// コストをリセットする
+		for (int i = 0; i < polygons.size(); i++)
+		{
+			polygons[i].cost = INT_MAX;
+			polygons[i].heuristic_cost = -1;
+			if (i == goal_index)
+			{
+				target_polygon = &polygons[i];
+			}
+		}
+		if (target_polygon == nullptr) return path; // invalid argument
+		// コスト計算する
+		std::vector<int> open_list, close_list;
+		open_list.emplace_back(current_index);
+		polygons[current_index].cost = 0;
+		while (open_list.size() != 0)
+		{
+			int index = *open_list.begin();
+			open_list.erase(open_list.begin());
+
+			for (auto&& adjacent : polygons[index].adjacents)
+			{
+				auto target = adjacent.neighbour_polygon;
+				// 隣接ノードをチェックする
+				auto&& it = std::find(close_list.begin(), close_list.end(), target->current_index);
+				if (it != close_list.end()) continue;// すでにクローズ済み
+				// ヒューリスティックコストを計算
+				if (target->heuristic_cost == -1)
+				{
+					target->heuristic_cost = Collision::CalcSqDistance(target->center_pos, polygons[goal_index].center_pos);
+				}
+				int edge_cost = Collision::CalcSqDistance(target->center_pos, polygons[index].center_pos);
+				int cost = polygons[index].cost + edge_cost + target->heuristic_cost;
+				// 合計コストの比較
+				if (target->cost < cost) continue; // コスト更新ならず
+				target->cost = cost;
+				open_list.emplace_back(target->current_index);
+				target->prev_path_index = index;
+				//std::cout << index << " -> " << target->current_index 
+				//	<< " polygons.cost:" << polygons[index].cost
+				//	<< " heuristic_cost:" << target->heuristic_cost
+				//	<< " cost:" << cost << std::endl;
+			}
+			close_list.emplace_back(index);
+		}
+		//std::cout << "Start:" << current_index << ", Goal:" << goal_index << std::endl;
+		// 逆順にチェックしてルートを確定する（経路テーブルに反映する）
+		ConvexPolygon* p = target_polygon;
+		while (p)
+		{
+			//std::cout << p->current_index << " -> ";
+			path.AddFront(p->current_index);
+			routings[p->current_index][goal_index] = polygons[p->prev_path_index].current_index;
+			if (p->current_index == current_index) break;
+			p = &polygons[p->prev_path_index];
+		}
+		//std::cout << std::endl;
+		return path;
+	}
 	void Print()
 	{
 		for (int i = 0; i < routings.size(); i++)
@@ -295,77 +356,6 @@ static int GetIndex(const std::vector<ConvexPolygon>& polygons, const Vector3<in
 	return -1;
 }
 
-int CalcSqDistance(const Vector3<int>& pos1, const Vector3<int>& pos2)
-{
-	return
-		(pos1.x - pos2.x) * (pos1.x - pos2.x) +
-		(pos1.y - pos2.y) * (pos1.y - pos2.y);
-}
-
-Path_ PathFind(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons, int current_index, int goal_index)
-{
-	Path_ path(current_index, goal_index);
-	ConvexPolygon* target_polygon = nullptr;
-	// コストをリセットする
-	for (int i = 0; i < polygons.size(); i++)
-	{
-		polygons[i].cost = INT_MAX;
-		polygons[i].heuristic_cost = -1;
-		if (i == goal_index)
-		{
-			target_polygon = &polygons[i];
-		}
-	}
-	if (target_polygon == nullptr) return path; // invalid argument
-	// コスト計算する
-	std::vector<int> open_list, close_list;
-	open_list.emplace_back(current_index);
-	polygons[current_index].cost = 0;
-	while (open_list.size() != 0)
-	{
-		int index = *open_list.begin();
-		open_list.erase(open_list.begin());
-		
-		for (auto&& adjacent : polygons[index].adjacents)
-		{
-			auto target = adjacent.neighbour_polygon;
-			// 隣接ノードをチェックする
-			auto&& it = std::find(close_list.begin(), close_list.end(), target->current_index);
-			if (it != close_list.end()) continue;// すでにクローズ済み
-			// ヒューリスティックコストを計算
-			if (target->heuristic_cost == -1)
-			{
-				target->heuristic_cost = CalcSqDistance(target->center_pos, polygons[goal_index].center_pos);
-			}
-			int edge_cost = CalcSqDistance(target->center_pos, polygons[index].center_pos);
-			int cost = polygons[index].cost + edge_cost + target->heuristic_cost;
-			// 合計コストの比較
-			if (target->cost < cost) continue; // コスト更新ならず
-			target->cost = cost;
-			open_list.emplace_back(target->current_index);
-			target->prev_path_index = index;
-			//std::cout << index << " -> " << target->current_index 
-			//	<< " polygons.cost:" << polygons[index].cost
-			//	<< " heuristic_cost:" << target->heuristic_cost
-			//	<< " cost:" << cost << std::endl;
-		}
-		close_list.emplace_back(index);
-	}
-	//std::cout << "Start:" << current_index << ", Goal:" << goal_index << std::endl;
-	// 逆順にチェックしてルートを確定する（経路テーブルに反映する）
-	ConvexPolygon* p = target_polygon;
-	while (p)
-	{
-		//std::cout << p->current_index << " -> ";
-		path.AddFront(p->current_index);
-		routing_table[p->current_index][goal_index] = polygons[p->prev_path_index].current_index;
-		if (p->current_index == current_index) break;
-		p = &polygons[p->prev_path_index];
-	}
-	//std::cout << std::endl;
-	return path;
-}
-
 RoutingTable CreateRoutingTable(std::vector<ConvexPolygon>& polygons)
 {
 	RoutingTable routing_table;
@@ -383,7 +373,7 @@ RoutingTable CreateRoutingTable(std::vector<ConvexPolygon>& polygons)
 			if (i == j) continue;//同じノードに対しては省略
 			if (routing_table[i][j] != -1) continue;//探索済みなら省略
 			// 経路探索
-			PathFind(routing_table, polygons, i, j);
+			routing_table.PathFind(polygons, i, j);
 		}
 	}
 	return routing_table;
@@ -393,7 +383,7 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 {
 	int start = GetIndex(polygons, Vector3<int>(10, 10, 0));
 	int goal = GetIndex(polygons, Vector3<int>(30, 120, 0));
-	auto&& path = PathFind(routing_table, polygons, start, goal);
+	auto&& path = routing_table.PathFind(polygons, start, goal);
 	Vector3<int> next;
 	// ゴールまで直線的に行けるか？
 
@@ -440,19 +430,14 @@ int main()
 	// ④ポリゴン総当たり経路探索を行って経路テーブルを作る。
 	auto&& routing_table = CreateRoutingTable(polygons);
 	// 経路テーブル表示
-	routing_table.Print();
+	//routing_table.Print();
 
 	// ⑤目的座標を元に次に行くべき座標を決定する。
 	// 直線的に移動できるかチェック→壁の交差判定
-	OutputIndex(polygons, Vector3<int>(10, 10, 0));
-	OutputIndex(polygons, Vector3<int>(30, 30, 0));
-	OutputIndex(polygons, Vector3<int>(130, 50, 0));
-	OutputIndex(polygons, Vector3<int>(50, 70, 0));
-
 	int start = GetIndex(polygons, Vector3<int>(10, 10, 0));
 	int goal = GetIndex(polygons, Vector3<int>(30, 120, 0));
-	auto&& path = PathFind(routing_table, polygons, start, goal);
+	auto&& path = routing_table.PathFind(polygons, start, goal);
 	path.Print();
-
+	
 	return 0;
 }

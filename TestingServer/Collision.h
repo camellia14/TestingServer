@@ -9,7 +9,15 @@ class Collision
 {
 public:
 	template <typename T>
-	static int OuterProduct(const Vector3<T>& v1, const Vector3<T>& v2)
+	static T CalcSqDistance(const Vector3<T>& pos1, const Vector3<T>& pos2)
+	{
+		return
+			(pos1.x - pos2.x) * (pos1.x - pos2.x) +
+			(pos1.y - pos2.y) * (pos1.y - pos2.y);
+	}
+
+	template <typename T>
+	static T OuterProduct(const Vector3<T>& v1, const Vector3<T>& v2)
 	{
 		return v1.x * v2.y - v1.y * v2.x;
 	}

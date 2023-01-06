@@ -3,12 +3,12 @@
 #include <iostream>
 #include <vector>
 
-class Path_
+class Path
 {
 public:
 	int start, goal;
 	std::vector<int> indices;
-	Path_(int start, int goal):start(start), goal(goal) {}
+	Path(int start, int goal):start(start), goal(goal) {}
 	void Add(int index)
 	{
 		indices.emplace_back(index);
