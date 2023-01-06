@@ -66,11 +66,6 @@ typedef Line Wall;
 typedef std::vector<Wall> Walls;
 typedef std::vector<int> Path;
 
-template <typename T>
-static int OuterProduct(const Vector3<T>& v1, const Vector3<T>& v2)
-{
-	return v1.x * v2.y - v1.y * v2.x;
-}
 class ConvexPolygon;
 // 隣接情報
 class AdjacentData
@@ -129,7 +124,7 @@ public:
 	{
 		for (int i = 0; i < vertices.size(); i++) {
 			int next = (i + 1) % vertices.size();
-			if (OuterProduct(vertices[i] - vertices[next], vertices[i] - pos) < 0) {
+			if (Collision::OuterProduct(vertices[i] - vertices[next], vertices[i] - pos) < 0) {
 				return false;
 			}
 		}
@@ -142,6 +137,19 @@ class RoutingTable
 public:
 	//current_index, goal_index, next_index
 	std::map<int, std::map<int, int>> routings;
+	std::map<int, int>& operator[](int i) { return routings[i]; }
+	
+	void Print()
+	{
+		for (int i = 0; i < routings.size(); i++)
+		{
+			for (int j = 0; j < routings[i].size(); j++)
+			{
+				if (i == j) continue;
+				std::cout << "RoutingTable[" << i << "][" << j << "] = " << routings[i][j] << std::endl;
+			}
+		}
+	}
 };
 
 // 隣接情報を設定する。
@@ -190,7 +198,7 @@ bool IsConvexSet(const std::vector<Line>& lines)
 		//	<< " Vec2:(" << vector2.x << "," << vector2.y << ")" 
 		//	<< " OuterProduct:" << OuterProduct(vector1, vector2) << std::endl;
 
-		if (OuterProduct(vector1, vector2) < 0)
+		if (Collision::OuterProduct(vector1, vector2) < 0)
 		{
 			return false;
 		}
@@ -350,7 +358,7 @@ Path_ PathFind(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons
 	{
 		//std::cout << p->current_index << " -> ";
 		path.AddFront(p->current_index);
-		routing_table.routings[p->current_index][goal_index] = polygons[p->prev_path_index].current_index;
+		routing_table[p->current_index][goal_index] = polygons[p->prev_path_index].current_index;
 		if (p->current_index == current_index) break;
 		p = &polygons[p->prev_path_index];
 	}
@@ -365,7 +373,7 @@ RoutingTable CreateRoutingTable(std::vector<ConvexPolygon>& polygons)
 	{
 		for (int j = 0; j < polygons.size(); j++)
 		{
-			routing_table.routings[i][j] = -1;
+			routing_table[i][j] = -1;
 		}
 	}
 	for (int i = 0; i < polygons.size(); i++)
@@ -373,7 +381,7 @@ RoutingTable CreateRoutingTable(std::vector<ConvexPolygon>& polygons)
 		for (int j = 0; j < polygons.size(); j++)
 		{
 			if (i == j) continue;//同じノードに対しては省略
-			if (routing_table.routings[i][j] != -1) continue;//探索済みなら省略
+			if (routing_table[i][j] != -1) continue;//探索済みなら省略
 			// 経路探索
 			PathFind(routing_table, polygons, i, j);
 		}
@@ -415,26 +423,9 @@ int main()
 		polygon.lines.emplace_back(polygon.vertices[2], polygon.vertices[0]);
 		polygons.emplace_back(polygon);
 	}
-	//std::cout << "------------------------------------------" << std::endl;
-	//std::cout << "* Polygon" << std::endl;
-	//std::cout << "polygons.size:" << polygons.size() << std::endl;
-	//for (int i = 0; i < polygons.size(); i++)
-	//{
-	//	std::cout << "Index:";
-	//	for (int index : polygons[i].indices)
-	//	{
-	//		std::cout << index << ", ";
-	//	}
-	//	std::cout << std::endl;
-	//}
-	std::cout << "------------------------------------------" << std::endl;
-	std::cout << "* Combine" << std::endl;
-	// 凸集合リストを作成
-	int conbine_num = SetupConvexSet(polygons);
-	while (conbine_num > 0)// 合成しなくなるまで繰り返す
-	{
-		conbine_num = SetupConvexSet(polygons);
-	}
+	// 凸集合リストを作成(合成しなくなるまで繰り返す)
+	while (SetupConvexSet(polygons) > 0);
+
 	// 結合
 	std::cout << "polygons.size:" << polygons.size() << std::endl;
 	for (int i = 0; i < polygons.size(); i++)
@@ -445,30 +436,11 @@ int main()
 	
 	// ③隣接するポリゴンとの接点インデックスを保持する
 	MakeUpAdjacentData(polygons);
-	//for (int i = 0; i < polygons.size(); i++)
-	//{
-	//	std::cout << "Polygon[" << i << "]'s Adjacent Wall" << std::endl;
-	//	for (auto&& adjacent : polygons[i].adjacents)
-	//	{
-	//		if (adjacent.wall.size() == 2)
-	//		{
-	//			std::cout << adjacent.wall[0] << ", " << adjacent.wall[1] << std::endl;
-	//		}
-	//	}
-	//}
 	
 	// ④ポリゴン総当たり経路探索を行って経路テーブルを作る。
 	auto&& routing_table = CreateRoutingTable(polygons);
 	// 経路テーブル表示
-	//for (int i = 0; i < routing_table.routings.size(); i++)
-	//{
-	//	for (int j = 0; j < routing_table.routings[i].size(); j++)
-	//	{
-	//		if (i == j) continue;
-	//		int next = routing_table.routings[i][j];
-	//		std::cout << "RoutingTable[" << i << "][" << j << "] = " << next << std::endl;
-	//	}
-	//}
+	routing_table.Print();
 
 	// ⑤目的座標を元に次に行くべき座標を決定する。
 	// 直線的に移動できるかチェック→壁の交差判定
