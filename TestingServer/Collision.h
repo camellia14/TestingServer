@@ -43,13 +43,13 @@ public:
 	static bool IsIntersectLineAndLineSegment(const Line& line1, const Line& line2)
 	{
 		auto&& vector1 = line1.GetVector();
-		bool op1 = OuterProduct(vector1, line2[0] - line1[0]);
-		bool op2 = OuterProduct(vector1, line2[1] - line1[0]);
+		auto op1 = OuterProduct(vector1, line2[0] - line1[0]);
+		auto op2 = OuterProduct(vector1, line2[1] - line1[0]);
 		if (op1 * op2 <= 0)
 		{
 			auto&& vector2 = line2.GetVector();
-			bool op3 = OuterProduct(vector2, line1[0] - line2[0]);
-			bool op4 = OuterProduct(vector2, line1[1] - line2[0]);
+			auto op3 = OuterProduct(vector2, line1[0] - line2[0]);
+			auto op4 = OuterProduct(vector2, line1[1] - line2[0]);
 			if (op3 * op4 <= 0)
 			{
 				return true;
