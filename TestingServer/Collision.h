@@ -40,7 +40,7 @@ public:
 		return true;
 	}
 	
-	static bool IsIntersectLineAndLineSegment(Line& line1, Line& line2)
+	static bool IsIntersectLineAndLineSegment(const Line& line1, const Line& line2)
 	{
 		auto&& vector1 = line1[0] - line1[1];
 		bool op1 = OuterProduct(vector1, line2[0] - line1[0]);
@@ -57,7 +57,7 @@ public:
 		}
 		return false;
 	}
-	static bool IsIntersectLineSegment(Line& line1, Line& line2)
+	static bool IsIntersectLineSegment(const Line& line1, const Line& line2)
 	{
 		return IsIntersectLineAndLineSegment(line1, line2) &&
 			IsIntersectLineAndLineSegment(line2, line1);
