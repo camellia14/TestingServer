@@ -8,88 +8,88 @@ public:
 	Vector3() {}
 	Vector3(T x, T y, T z) :x(x), y(y), z(z) {}
 
-	Vector3<T> operator +(Vector3<T> v) const
+	inline Vector3<T> operator +(Vector3<T> v) const
 	{
 		return Vector3<T>(x + v.x, y + v.y, z + v.z);
 	}
-	Vector3<T> operator -(Vector3<T> v) const
+	inline Vector3<T> operator -(Vector3<T> v) const
 	{
 		return Vector3<T>(x - v.x, y - v.y, z - v.z);
 	}
-	Vector3<T> operator *(Vector3<T> v) const
+	inline Vector3<T> operator *(Vector3<T> v) const
 	{
 		return Vector3<T>(x * v.x, y * v.y, z * v.z);
 	}
-	Vector3<T> operator /(Vector3<T> v) const
+	inline Vector3<T> operator /(Vector3<T> v) const
 	{
 		return Vector3<T>(x / v.x, y / v.y, z / v.z);
 	}
-	Vector3<T> operator +(T v) const
+	inline Vector3<T> operator +(T v) const
 	{
 		return Vector3<T>(x + v, y + v, z + v);
 	}
-	Vector3<T> operator -(T v) const
+	inline Vector3<T> operator -(T v) const
 	{
 		return Vector3<T>(x - v, y - v, z - v);
 	}
-	Vector3<T> operator *(T v) const
+	inline Vector3<T> operator *(T v) const
 	{
 		return Vector3<T>(x * v, y * v, z * v);
 	}
-	Vector3<T> operator /(T v) const
+	inline Vector3<T> operator /(T v) const
 	{
 		return Vector3<T>(x / v, y / v, z / v);
 	}
-	void operator +=(Vector3<T> v)
+	inline void operator +=(Vector3<T> v)
 	{
 		x += v.x;
 		y += v.y;
 		z += v.z;
 	}
-	void operator -=(Vector3<T> v)
+	inline void operator -=(Vector3<T> v)
 	{
 		x -= v.x;
 		y -= v.y;
 		z -= v.z;
 	}
-	void operator *=(Vector3<T> v)
+	inline void operator *=(Vector3<T> v)
 	{
 		x *= v.x;
 		y *= v.y;
 		z *= v.z;
 	}
-	void operator /=(Vector3<T> v)
+	inline void operator /=(Vector3<T> v)
 	{
 		x /= v.x;
 		y /= v.y;
 		z /= v.z;
 	}
-	void operator +=(T v)
+	inline void operator +=(T v)
 	{
 		x += v;
 		y += v;
 		z += v;
 	}
-	void operator -=(T v)
+	inline void operator -=(T v)
 	{
 		x -= v;
 		y -= v;
 		z -= v;
 	}
-	void operator *=(T v)
+	inline void operator *=(T v)
 	{
 		x *= x;
 		y *= y;
 		z *= z;
 	}
-	void operator /=(T v)
+	inline void operator /=(T v)
 	{
 		x /= x;
 		y /= y;
 		z /= z;
 	}
 
-	bool operator==(const Vector3<T>& v) const {
+	inline bool operator==(const Vector3<T>& v) const {
 		return x == v.x && y == v.y && z == v.z;
 	}
 };
