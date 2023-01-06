@@ -66,16 +66,18 @@ typedef Line Wall;
 typedef std::vector<Wall> Walls;
 
 class ConvexPolygon;
-// 隣接情報
-class AdjacentData
-{
-public:
-	Wall wall;
-	ConvexPolygon* neighbour_polygon = nullptr;
-};
+
 // 三角形を順番につなげて、凹みが無い間はずっとひとまとめにし続ける
 class ConvexPolygon
 {
+public:
+	// 隣接情報
+	class AdjacentData
+	{
+	public:
+		Wall wall;
+		ConvexPolygon* neighbour_polygon = nullptr;
+	};
 public:
 	int current_index;
 	int prev_path_index;
@@ -225,7 +227,7 @@ Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
 			if (polygon == adjacent_polygon) continue;
 			if (polygon.IsAdjacent(adjacent_polygon))
 			{
-				AdjacentData adjecent;
+				ConvexPolygon::AdjacentData adjecent;
 				adjecent.wall = std::move(polygon.GetAdjacentWall(adjacent_polygon));
 				adjecent.neighbour_polygon = &adjacent_polygon;
 				polygon.adjacents.emplace_back(adjecent);
@@ -236,36 +238,6 @@ Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
 	return walls;
 }
 
-// 凸集合か
-bool IsConvexSet(const std::vector<Line>& lines)
-{
-	if (lines.size() < 3) return false;
-	for (int i = 0; i < lines.size(); i++)
-	{
-		auto&& line1 = lines[i];
-		auto&& line2 = lines[(i + 1) % lines.size()];
-		Vector3<int> p1 = line1[0];
-		Vector3<int> p2 = line1[1];
-		Vector3<int> p3 = line2[0];
-		Vector3<int> p4 = line2[1];
-		auto&& vector1 = line1.GetVector();
-		auto&& vector2 = line2.GetVector();
-		//std::cout
-		//	<< " p1:(" << p1.x << "," << p1.y << ")"
-		//	<< " p2:(" << p2.x << "," << p2.y << ")"
-		//	<< " p3:(" << p3.x << "," << p3.y << ")"
-		//	<< " p4:(" << p4.x << "," << p4.y << ")"
-		//	<< " Vec1:(" << vector1.x << "," << vector1.y << ")" 
-		//	<< " Vec2:(" << vector2.x << "," << vector2.y << ")" 
-		//	<< " OuterProduct:" << OuterProduct(vector1, vector2) << std::endl;
-
-		if (Collision::OuterProduct(vector1, vector2) < 0)
-		{
-			return false;
-		}
-	}
-	return true;
-}
 std::vector<Line> CreateLines(std::vector<Line> line1, std::vector<Line> line2)
 {
 	int insert_index = -1;
@@ -328,7 +300,7 @@ int SetupConvexSet(std::vector<ConvexPolygon>& polygons)
 			if (polygons[j].vertices.size() == 0) continue;
 
 			auto&& combine_lines = CreateLines(convex_polygon.lines, polygons[j].lines);
-			if (IsConvexSet(combine_lines))
+			if (Collision::IsConvexSet(combine_lines))
 			{
 				combine_count++;
 				convex_polygon.vertices.clear();

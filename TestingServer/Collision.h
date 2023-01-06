@@ -21,7 +21,9 @@ public:
 	{
 		return v1.x * v2.y - v1.y * v2.x;
 	}
-	bool IsConvexSet(std::vector<Line>& lines)
+	
+	// 凸集合か
+	static bool IsConvexSet(std::vector<Line>& lines)
 	{
 		if (lines.size() < 3) return false;
 		for (int i = 0; i < lines.size(); i++)
@@ -37,6 +39,7 @@ public:
 		}
 		return true;
 	}
+	
 	static bool IsIntersectLineAndLineSegment(Line& line1, Line& line2)
 	{
 		auto&& vector1 = line1[0] - line1[1];
