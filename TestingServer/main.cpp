@@ -202,6 +202,28 @@ public:
 		//std::cout << std::endl;
 		return path;
 	}
+	static RoutingTable Create(std::vector<ConvexPolygon>& polygons)
+	{
+		RoutingTable routing_table;
+		for (int i = 0; i < polygons.size(); i++)
+		{
+			for (int j = 0; j < polygons.size(); j++)
+			{
+				routing_table[i][j] = -1;
+			}
+		}
+		for (int i = 0; i < polygons.size(); i++)
+		{
+			for (int j = 0; j < polygons.size(); j++)
+			{
+				if (i == j) continue;//同じノードに対しては省略
+				if (routing_table[i][j] != -1) continue;//探索済みなら省略
+				// 経路探索
+				routing_table.PathFind(polygons, i, j);
+			}
+		}
+		return routing_table;
+	}
 	void Print()
 	{
 		for (int i = 0; i < routings.size(); i++)
@@ -328,29 +350,6 @@ static int GetIndex(const std::vector<ConvexPolygon>& polygons, const Vector3<in
 	return -1;
 }
 
-RoutingTable CreateRoutingTable(std::vector<ConvexPolygon>& polygons)
-{
-	RoutingTable routing_table;
-	for (int i = 0; i < polygons.size(); i++)
-	{
-		for (int j = 0; j < polygons.size(); j++)
-		{
-			routing_table[i][j] = -1;
-		}
-	}
-	for (int i = 0; i < polygons.size(); i++)
-	{
-		for (int j = 0; j < polygons.size(); j++)
-		{
-			if (i == j) continue;//同じノードに対しては省略
-			if (routing_table[i][j] != -1) continue;//探索済みなら省略
-			// 経路探索
-			routing_table.PathFind(polygons, i, j);
-		}
-	}
-	return routing_table;
-}
-
 Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons, const Vector3<int>& current_pos, const Vector3<int>& target_pos)
 {
 	int start = GetIndex(polygons, Vector3<int>(10, 10, 0));
@@ -400,7 +399,7 @@ int main()
 	MakeUpAdjacentData(polygons);
 	
 	// ④ポリゴン総当たり経路探索を行って経路テーブルを作る。
-	auto&& routing_table = CreateRoutingTable(polygons);
+	auto&& routing_table = RoutingTable::Create(polygons);
 	// 経路テーブル表示
 	//routing_table.Print();
 
