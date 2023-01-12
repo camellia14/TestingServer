@@ -143,6 +143,156 @@ public:
 	}
 };
 
+class PolygonList
+{
+public:
+	std::vector<ConvexPolygon> polygons;
+	void Setup(const std::vector<Vector3<int>>& vertices, const std::vector<int>& indices)
+	{
+		for (int i = 0; i < indices.size();)
+		{
+			ConvexPolygon polygon;
+			polygon.vertices.emplace_back(vertices[indices[i++]]);
+			polygon.vertices.emplace_back(vertices[indices[i++]]);
+			polygon.vertices.emplace_back(vertices[indices[i++]]);
+			polygon.lines.emplace_back(polygon.vertices[0], polygon.vertices[1]);
+			polygon.lines.emplace_back(polygon.vertices[1], polygon.vertices[2]);
+			polygon.lines.emplace_back(polygon.vertices[2], polygon.vertices[0]);
+			polygons.emplace_back(polygon);
+		}
+		// 凸集合リストを作成(合成しなくなるまで繰り返す)
+		while (SetupConvexSet() > 0);
+		// 結合
+		std::cout << "polygons.size:" << polygons.size() << std::endl;
+		for (int i = 0; i < polygons.size(); i++)
+		{
+			polygons[i].center_pos = polygons[i].vertices[0];
+			polygons[i].current_index = i;
+		}
+		MakeUpAdjacentData(polygons);
+	}
+	// 凸集合ポリゴンのリストをセットアップする（一度で完全な状態にはならない）
+	int SetupConvexSet()
+	{
+		int combine_count = 0;
+		std::vector<ConvexPolygon> combine_polygons;
+		for (int i = 0; i < polygons.size(); i++)
+		{
+			if (polygons[i].vertices.size() == 0) continue;
+			ConvexPolygon convex_polygon = polygons[i];
+			for (int j = i + 1; j < polygons.size(); j++)
+			{
+				if (polygons[j].vertices.size() == 0) continue;
+
+				auto&& combine_lines = CreateLines(convex_polygon.lines, polygons[j].lines);
+				if (Collision::IsConvexSet(combine_lines))
+				{
+					combine_count++;
+					convex_polygon.vertices.clear();
+					for (auto&& line : combine_lines) {
+						convex_polygon.vertices.emplace_back(line[0]);
+					}
+					convex_polygon.lines = combine_lines;
+
+					polygons[j].vertices.clear();
+				}
+			}
+			combine_polygons.emplace_back(convex_polygon);
+		}
+		polygons = combine_polygons;
+		return combine_count;
+	}
+	std::vector<Line> CreateLines(std::vector<Line> line1, std::vector<Line> line2)
+	{
+		int insert_index = -1;
+		bool is_adjacent = false;
+		// insertするべき場所を求める
+		for (int i = 0; i < line1.size(); i++)
+		{
+			// line1のものがline2の中にあるか？
+			Line& line = line1[i];
+			for (auto&& it = line2.begin(); it != line2.end(); it++)
+			{
+				if (line1[i][0] == (*it)[1] &&
+					line1[i][1] == (*it)[0])
+				{
+					is_adjacent = true;
+					line1.erase(line1.begin() + i);
+					line2.erase(it);
+					if (insert_index == -1) insert_index = i;
+					break;
+				}
+			}
+		}
+		if (insert_index >= line1.size())
+		{
+			line1.insert(line1.end(), line2.begin(), line2.end());
+		}
+		else
+		{
+			line1.insert(line1.begin() + insert_index, line2.begin(), line2.end());
+		}
+		if (false == is_adjacent) return {};
+		// 並び変え
+		for (int i = 0; i < line1.size() - 1; i++)
+		{
+			for (int j = i + 1; j < line1.size(); j++)
+			{
+				if (line1[i][1] == line1[j][0])
+				{
+					if (i + 1 == j) break;//swap無し
+					auto temp = line1[i + 1];
+					line1[i + 1] = line1[j];
+					line1[j] = temp;
+					break;
+				}
+			}
+		}
+		return line1;
+	}
+	// 隣接情報を設定する。
+	Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
+	{
+		Walls walls;
+		for (auto&& polygon : polygons)
+		{
+			polygon.adjacents.clear();
+			for (auto&& adjacent_polygon : polygons)
+			{
+				if (polygon == adjacent_polygon) continue;
+				if (polygon.IsAdjacent(adjacent_polygon))
+				{
+					ConvexPolygon::AdjacentData adjacent;
+					adjacent.wall = std::move(polygon.GetAdjacentWall(adjacent_polygon));
+					adjacent.neighbour_polygon = &adjacent_polygon;
+					polygon.adjacents.emplace_back(adjacent);
+					walls.emplace_back(polygon.GetAdjacentWall(adjacent_polygon));
+				}
+			}
+		}
+		for (auto&& polygon : polygons)
+		{
+			for (auto&& wall : walls)
+			{
+				auto&& it = std::find_if(polygon.lines.begin(), polygon.lines.end(),
+					[search_line = wall](const Line& line) {
+						return (search_line[0] == line[0] && search_line[1] == line[1]) ||
+						(search_line[0] == line[1] && search_line[1] == line[0]);
+					});
+				if (it != polygon.lines.end())
+				{
+					//std::cout << "Remove Line ("
+					//	<< (*it)[0].x << ", " << (*it)[0].y << "), ("
+					//	<< (*it)[1].x << ", " << (*it)[1].y << ")" << std::endl;
+					polygon.lines.erase(it);
+				}
+			}
+		}
+		return walls;
+	}
+
+};
+
 class RoutingTable
 {
 public:
@@ -201,16 +351,15 @@ public:
 		//std::cout << "Start:" << current_index << ", Goal:" << goal_index << std::endl;
 		// 逆順にチェックしてルートを確定する（経路テーブルに反映する）
 		ConvexPolygon* p = target_polygon;
-		while (p)
+		while (p->current_index != current_index)
 		{
 			path.AddFront(p->current_index);
 			routings[p->prev_path_index][goal_index] = p->current_index;
-			if (p->prev_path_index == current_index) break;
 			p = &polygons[p->prev_path_index];
 		}
 		return path;
 	}
-	Path GetPath(std::vector<ConvexPolygon>& polygons, int current_index, int goal_index)
+	Path GetPath(int current_index, int goal_index)
 	{
 		Path path(current_index, goal_index);
 		if (current_index == -1 || goal_index == -1) return path;
@@ -223,24 +372,24 @@ public:
 		path.Add(goal_index);
 		return path;
 	}
-	static RoutingTable Create(std::vector<ConvexPolygon>& polygons)
+	static RoutingTable Create(PolygonList& polygon_list)
 	{
 		RoutingTable routing_table;
-		for (int i = 0; i < polygons.size(); i++)
+		for (int i = 0; i < polygon_list.polygons.size(); i++)
 		{
-			for (int j = 0; j < polygons.size(); j++)
+			for (int j = 0; j < polygon_list.polygons.size(); j++)
 			{
 				routing_table[i][j] = -1;
 			}
 		}
-		for (int i = 0; i < polygons.size(); i++)
+		for (int i = 0; i < polygon_list.polygons.size(); i++)
 		{
-			for (int j = 0; j < polygons.size(); j++)
+			for (int j = 0; j < polygon_list.polygons.size(); j++)
 			{
 				if (i == j) continue;//同じノードに対しては省略
 				if (routing_table[i][j] != -1) continue;//探索済みなら省略
 				// 経路探索
-				routing_table.PathFind(polygons, i, j);
+				routing_table.PathFind(polygon_list.polygons, i, j);
 			}
 		}
 		return routing_table;
@@ -257,127 +406,6 @@ public:
 		}
 	}
 };
-
-// 隣接情報を設定する。
-Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
-{
-	Walls walls;
-	for (auto&& polygon : polygons)
-	{
-		polygon.adjacents.clear();
-		for (auto&& adjacent_polygon : polygons)
-		{
-			if (polygon == adjacent_polygon) continue;
-			if (polygon.IsAdjacent(adjacent_polygon))
-			{
-				ConvexPolygon::AdjacentData adjacent;
-				adjacent.wall = std::move(polygon.GetAdjacentWall(adjacent_polygon));
-				adjacent.neighbour_polygon = &adjacent_polygon;
-				polygon.adjacents.emplace_back(adjacent);
-				walls.emplace_back(polygon.GetAdjacentWall(adjacent_polygon));
-			}
-		}
-	}
-	for (auto&& polygon : polygons)
-	{
-		for (auto&& wall : walls)
-		{
-			auto&& it = std::find_if(polygon.lines.begin(), polygon.lines.end(),
-				[search_line = wall](const Line& line) {
-					return (search_line[0] == line[0] && search_line[1] == line[1]) ||
-					(search_line[0] == line[1] && search_line[1] == line[0]);
-				});
-			if (it != polygon.lines.end())
-			{
-				std::cout << "Remove Line ("
-					<< (*it)[0].x << ", " << (*it)[0].y << "), ("
-					<< (*it)[1].x << ", " << (*it)[1].y << ")" << std::endl;
-				polygon.lines.erase(it);
-			}
-		}
-	}
-	return walls;
-}
-
-std::vector<Line> CreateLines(std::vector<Line> line1, std::vector<Line> line2)
-{
-	int insert_index = -1;
-	bool is_adjacent = false;
-	// insertするべき場所を求める
-	for (int i = 0; i < line1.size(); i++)
-	{
-		// line1のものがline2の中にあるか？
-		Line& line = line1[i];
-		for (auto&& it = line2.begin(); it != line2.end(); it++)
-		{
-			if (line1[i][0] == (*it)[1] &&
-				line1[i][1] == (*it)[0])
-			{
-				is_adjacent = true;
-				line1.erase(line1.begin() + i);
-				line2.erase(it);
-				if (insert_index == -1) insert_index = i;
-				break;
-			}
-		}
-	}
-	if (insert_index >= line1.size())
-	{
-		line1.insert(line1.end(), line2.begin(), line2.end());
-	}
-	else
-	{
-		line1.insert(line1.begin() + insert_index, line2.begin(), line2.end());
-	}
-	if (false == is_adjacent) return {};
-	// 並び変え
-	for (int i = 0; i < line1.size() - 1; i++)
-	{
-		for (int j = i + 1; j < line1.size(); j++)
-		{
-			if (line1[i][1] == line1[j][0])
-			{
-				if (i + 1 == j) break;//swap無し
-				auto temp = line1[i + 1];
-				line1[i + 1] = line1[j];
-				line1[j] = temp;
-				break;
-			}
-		}
-	}
-	return line1;
-}
-// 凸集合ポリゴンのリストをセットアップする（一度で完全な状態にはならない）
-int SetupConvexSet(std::vector<ConvexPolygon>& polygons)
-{
-	int combine_count = 0;
-	std::vector<ConvexPolygon> combine_polygons;
-	for (int i = 0; i < polygons.size(); i++)
-	{
-		if (polygons[i].vertices.size() == 0) continue;
-		ConvexPolygon convex_polygon = polygons[i];
-		for (int j = i + 1; j < polygons.size(); j++)
-		{
-			if (polygons[j].vertices.size() == 0) continue;
-
-			auto&& combine_lines = CreateLines(convex_polygon.lines, polygons[j].lines);
-			if (Collision::IsConvexSet(combine_lines))
-			{
-				combine_count++;
-				convex_polygon.vertices.clear();
-				for (auto&& line : combine_lines) {
-					convex_polygon.vertices.emplace_back(line[0]);
-				}
-				convex_polygon.lines = combine_lines;
-
-				polygons[j].vertices.clear();
-			}
-		}
-		combine_polygons.emplace_back(convex_polygon);
-	}
-	polygons = combine_polygons;
-	return combine_count;
-}
 
 static int GetIndex(const std::vector<ConvexPolygon>& polygons, const Vector3<int>& pos)
 {
@@ -406,7 +434,7 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 {
 	int start = GetIndex(polygons, current_pos);
 	int goal = GetIndex(polygons, target_pos);
-	auto&& path = routing_table.GetPath(polygons, start, goal);
+	auto&& path = routing_table.GetPath(start, goal);
 	bool is_intersect = false;
 
 	Vector3<int> base = current_pos;
@@ -492,48 +520,15 @@ void OutputIndex(std::vector<ConvexPolygon>& polygons, const Vector3<int>& searc
 int main()
 {
 	std::cout << "Testing Server" << std::endl;
-	// 三角形のポリゴンをリストアップする
-	std::vector<ConvexPolygon> polygons;
-	for (int i = 0; i < indices.size();)
-	{
-		ConvexPolygon polygon;
-		polygon.vertices.emplace_back(vertices[indices[i++]]);
-		polygon.vertices.emplace_back(vertices[indices[i++]]);
-		polygon.vertices.emplace_back(vertices[indices[i++]]);
-		polygon.lines.emplace_back(polygon.vertices[0], polygon.vertices[1]);
-		polygon.lines.emplace_back(polygon.vertices[1], polygon.vertices[2]);
-		polygon.lines.emplace_back(polygon.vertices[2], polygon.vertices[0]);
-		polygons.emplace_back(polygon);
-	}
-	// 凸集合リストを作成(合成しなくなるまで繰り返す)
-	while (SetupConvexSet(polygons) > 0);
-
-	// 結合
-	std::cout << "polygons.size:" << polygons.size() << std::endl;
-	for (int i = 0; i < polygons.size(); i++)
-	{
-		polygons[i].center_pos = polygons[i].vertices[0];
-		polygons[i].current_index = i;
-	}
-	
-	// ③隣接するポリゴンとの接点インデックスを保持する
-	MakeUpAdjacentData(polygons);
-	
-	// ④ポリゴン総当たり経路探索を行って経路テーブルを作る。
+	PolygonList polygons;
+	// 頂点とインデックス情報を元にノードリストを作成し、凸形状を維持しながら結合する。
+	polygons.Setup(vertices, indices);
+	// 各ノードを
 	auto&& routing_table = RoutingTable::Create(polygons);
-	// 経路テーブル表示
 	//routing_table.Print();
-
-	// ⑤目的座標を元に次に行くべき座標を決定する。
-	// 直線的に移動できるかチェック→壁の交差判定
-	//int start = GetIndex(polygons, Vector3<int>(10, 10, 0));
-	////int goal = GetIndex(polygons, Vector3<int>(30, 120, 0));
-	//int goal = GetIndex(polygons, Vector3<int>(30, 10, 0));
-	//auto&& path = routing_table.PathFind(polygons, start, goal);
-	//path.Print();
 	auto start = std::chrono::system_clock::now();
 	for (int i = 0; i < 1000; i++) {
-		GetNextPos(routing_table, polygons, Vector3<int>(10, 10, 0), Vector3<int>(130, 60, 0));
+		GetNextPos(routing_table, polygons.polygons, Vector3<int>(10, 10, 0), Vector3<int>(130, 60, 0));
 	}
 	auto end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
