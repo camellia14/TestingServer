@@ -169,6 +169,7 @@ public:
 			polygons[i].center_pos = polygons[i].vertices[0];
 			polygons[i].current_index = i;
 		}
+		// 隣接情報を設定する。
 		MakeUpAdjacentData(polygons);
 	}
 	// 凸集合ポリゴンのリストをセットアップする（一度で完全な状態にはならない）
@@ -250,8 +251,7 @@ public:
 		}
 		return line1;
 	}
-	// 隣接情報を設定する。
-	Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
+	void MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
 	{
 		Walls walls;
 		for (auto&& polygon : polygons)
@@ -281,16 +281,11 @@ public:
 					});
 				if (it != polygon.lines.end())
 				{
-					//std::cout << "Remove Line ("
-					//	<< (*it)[0].x << ", " << (*it)[0].y << "), ("
-					//	<< (*it)[1].x << ", " << (*it)[1].y << ")" << std::endl;
 					polygon.lines.erase(it);
 				}
 			}
 		}
-		return walls;
 	}
-
 };
 
 class RoutingTable
@@ -523,7 +518,7 @@ int main()
 	PolygonList polygons;
 	// 頂点とインデックス情報を元にノードリストを作成し、凸形状を維持しながら結合する。
 	polygons.Setup(vertices, indices);
-	// 各ノードを
+	// 各ノードへの経路情報を作成する。
 	auto&& routing_table = RoutingTable::Create(polygons);
 	//routing_table.Print();
 	auto start = std::chrono::system_clock::now();
