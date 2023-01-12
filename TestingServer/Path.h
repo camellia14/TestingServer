@@ -3,11 +3,14 @@
 #include <iostream>
 #include <vector>
 
+#include "Vector3.h"
+
 class Path
 {
 public:
 	int start, goal;
 	std::vector<int> indices;
+	std::vector<Vector3<int>> positions;
 	Path(int start, int goal):start(start), goal(goal) {}
 	void Add(int index)
 	{

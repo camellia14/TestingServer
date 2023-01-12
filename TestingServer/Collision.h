@@ -40,27 +40,49 @@ public:
 		return true;
 	}
 	
-	static bool IsIntersectLineAndLineSegment(const Line& line1, const Line& line2)
+	static bool IsIntersectLineAndLineSegment(const Line& line1, const Line& line2, bool is_equal = true)
 	{
 		auto&& vector1 = line1.GetVector();
 		auto op1 = OuterProduct(vector1, line2[0] - line1[0]);
 		auto op2 = OuterProduct(vector1, line2[1] - line1[0]);
-		if (op1 * op2 <= 0)
+		if (is_equal)
 		{
-			auto&& vector2 = line2.GetVector();
-			auto op3 = OuterProduct(vector2, line1[0] - line2[0]);
-			auto op4 = OuterProduct(vector2, line1[1] - line2[0]);
-			if (op3 * op4 <= 0)
+			if (op1 * op2 <= 0)
 			{
-				return true;
+				auto&& vector2 = line2.GetVector();
+				auto op3 = OuterProduct(vector2, line1[0] - line2[0]);
+				auto op4 = OuterProduct(vector2, line1[1] - line2[0]);
+				if (op3 * op4 <= 0)
+				{
+					return true;
+				}
+			}
+		}
+		else
+		{
+			// equal無しの需要もあった
+			if (op1 * op2 < 0)
+			{
+				auto&& vector2 = line2.GetVector();
+				auto op3 = OuterProduct(vector2, line1[0] - line2[0]);
+				auto op4 = OuterProduct(vector2, line1[1] - line2[0]);
+				if (op3 * op4 < 0)
+				{
+					return true;
+				}
 			}
 		}
 		return false;
 	}
-	static bool IsIntersectLineSegment(const Line& line1, const Line& line2)
+	static bool IsIntersectLineSegment(const Line& line1, const Line& line2, bool is_equal = true)
 	{
-		return IsIntersectLineAndLineSegment(line1, line2) &&
-			IsIntersectLineAndLineSegment(line2, line1);
+		return IsIntersectLineAndLineSegment(line1, line2, is_equal) &&
+			IsIntersectLineAndLineSegment(line2, line1, is_equal);
 	}
-
+	static Vector3<int> IntersectLine(const Line& line1, const Line& line2)
+	{
+		double d = (line1[0].x - line1[1].x) * (line2[1].y - line2[0].y) - (line2[1].x - line2[0].x) * (line1[0].y - line1[1].y);
+		double t = ((line2[1].y - line2[0].y) * (line2[1].x - line1[1].x) + (line2[0].y - line2[1].y) * (line2[1].y - line1[1].y)) / d;
+		return Vector3<int>((int)(t * line1[0].x + (1.0 - t) * line1[1].x), (int)(t * line1[0].y + (1.0f - t) * line1[1].y), 0);
+	}
 };

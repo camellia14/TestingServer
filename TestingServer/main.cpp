@@ -2,6 +2,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <chrono>
 
 #include "Vector3.h"
 #include "Line.h"
@@ -121,6 +122,15 @@ public:
 		}
 		return Line();
 	}
+	AdjacentData* GetAdjacent(int index)
+	{
+		for (auto&& adjacent : adjacents) {
+			if (adjacent.neighbour_polygon->current_index == index) {
+				return &adjacent;
+			}
+		}
+		return nullptr;
+	}
 	bool IsPointInPolygon(const Vector3<int>& pos) const
 	{
 		for (int i = 0; i < vertices.size(); i++) {
@@ -193,13 +203,24 @@ public:
 		ConvexPolygon* p = target_polygon;
 		while (p)
 		{
-			//std::cout << p->current_index << " -> ";
 			path.AddFront(p->current_index);
-			routings[p->current_index][goal_index] = polygons[p->prev_path_index].current_index;
-			if (p->current_index == current_index) break;
+			routings[p->prev_path_index][goal_index] = p->current_index;
+			if (p->prev_path_index == current_index) break;
 			p = &polygons[p->prev_path_index];
 		}
-		//std::cout << std::endl;
+		return path;
+	}
+	Path GetPath(std::vector<ConvexPolygon>& polygons, int current_index, int goal_index)
+	{
+		Path path(current_index, goal_index);
+		if (current_index == -1 || goal_index == -1) return path;
+		int index = current_index;
+		while (index != goal_index)
+		{
+			path.Add(index);
+			index = routings[index][goal_index];
+		}
+		path.Add(goal_index);
 		return path;
 	}
 	static RoutingTable Create(std::vector<ConvexPolygon>& polygons)
@@ -249,11 +270,29 @@ Walls MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
 			if (polygon == adjacent_polygon) continue;
 			if (polygon.IsAdjacent(adjacent_polygon))
 			{
-				ConvexPolygon::AdjacentData adjecent;
-				adjecent.wall = std::move(polygon.GetAdjacentWall(adjacent_polygon));
-				adjecent.neighbour_polygon = &adjacent_polygon;
-				polygon.adjacents.emplace_back(adjecent);
+				ConvexPolygon::AdjacentData adjacent;
+				adjacent.wall = std::move(polygon.GetAdjacentWall(adjacent_polygon));
+				adjacent.neighbour_polygon = &adjacent_polygon;
+				polygon.adjacents.emplace_back(adjacent);
 				walls.emplace_back(polygon.GetAdjacentWall(adjacent_polygon));
+			}
+		}
+	}
+	for (auto&& polygon : polygons)
+	{
+		for (auto&& wall : walls)
+		{
+			auto&& it = std::find_if(polygon.lines.begin(), polygon.lines.end(),
+				[search_line = wall](const Line& line) {
+					return (search_line[0] == line[0] && search_line[1] == line[1]) ||
+					(search_line[0] == line[1] && search_line[1] == line[0]);
+				});
+			if (it != polygon.lines.end())
+			{
+				std::cout << "Remove Line ("
+					<< (*it)[0].x << ", " << (*it)[0].y << "), ("
+					<< (*it)[1].x << ", " << (*it)[1].y << ")" << std::endl;
+				polygon.lines.erase(it);
 			}
 		}
 	}
@@ -350,16 +389,98 @@ static int GetIndex(const std::vector<ConvexPolygon>& polygons, const Vector3<in
 	return -1;
 }
 
+bool IsIntersectWalls(const Path& path, std::vector<ConvexPolygon>& polygons, const Line& line_to_goal)
+{
+	for (int i = 0; i < polygons.size(); i++) {
+		for (auto&& line : polygons[i].lines) {
+			if (Collision::IsIntersectLineSegment(line, line_to_goal, false))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons, const Vector3<int>& current_pos, const Vector3<int>& target_pos)
 {
-	int start = GetIndex(polygons, Vector3<int>(10, 10, 0));
-	int goal = GetIndex(polygons, Vector3<int>(30, 120, 0));
-	auto&& path = routing_table.PathFind(polygons, start, goal);
-	Vector3<int> next;
-	// ゴールまで直線的に行けるか？
+	int start = GetIndex(polygons, current_pos);
+	int goal = GetIndex(polygons, target_pos);
+	auto&& path = routing_table.GetPath(polygons, start, goal);
+	bool is_intersect = false;
 
+	Vector3<int> base = current_pos;
+	path.positions.emplace_back(base);
+	Vector3<int> right, left, prev_right, prev_left;
+	for (int i = 0; i < path.indices.size() - 1; i++)
+	{
+		if (auto&& adjacent = polygons[path.indices[i]].GetAdjacent(path.indices[i + 1]))
+		{
+			right = adjacent->wall.vertices[0];
+			left = adjacent->wall.vertices[1];
+			Line right_line = Line(base, right);
+			Line left_line = Line(base, left);
 
-	return next;
+			// baseからright,leftにそれぞれ行けるか？
+			bool is_intersect_right = IsIntersectWalls(path, polygons, right_line);
+			bool is_intersect_left = IsIntersectWalls(path, polygons, left_line);
+			if (false == is_intersect_right && false == is_intersect_left)
+			{
+				// 行ける→次へ進む（prevをright, leftで更新）
+				prev_right = right;
+				prev_left = left;
+			}
+			else if (is_intersect_left && false == is_intersect_right)
+			{
+				// 右だけ行ける（左はprevを交点で更新）
+				prev_right = right;
+				Collision::IntersectLine(adjacent->wall, left_line);
+			}
+			else if (false == is_intersect_left && is_intersect_right)
+			{
+				// 左だけ行ける（右はprevを交点で更新）
+				prev_left = left;
+				Collision::IntersectLine(adjacent->wall, right_line);
+			}
+			else
+			{
+				// 両方いけない→右か左かを判定し、prevのどちらかをbaseに設定して次へ進む
+				if (Collision::OuterProduct(prev_right - base, right - base) < 0)
+				{
+					base = prev_right;
+				}
+				else
+				{
+					base = prev_left;
+				}
+				prev_right = right;
+				prev_left = left;
+				path.positions.emplace_back(base);
+			}
+		}
+	}
+	// baseから直接goalに行ける？->終わり
+	if (false == IsIntersectWalls(path, polygons, Line(base, target_pos)))
+	{
+		path.positions.emplace_back(target_pos);
+	}
+	// base-rightラインよりbase-goalラインの方が右なら右
+	else if (Collision::OuterProduct(target_pos - base, right - base) > 0)
+	{
+		path.positions.emplace_back(right);
+		path.positions.emplace_back(target_pos);
+	}
+	else
+	{
+		path.positions.emplace_back(left);
+		path.positions.emplace_back(target_pos);
+	}
+	//std::cout << "Path" << std::endl;
+	//for (auto&& pos : path.positions)
+	//{
+	//	std::cout << "(" << pos.x << ", " << pos.y << ")" << std::endl;
+	//}
+	return target_pos;
 }
 
 void OutputIndex(std::vector<ConvexPolygon>& polygons, const Vector3<int>& search_pos)
@@ -405,10 +526,18 @@ int main()
 
 	// ⑤目的座標を元に次に行くべき座標を決定する。
 	// 直線的に移動できるかチェック→壁の交差判定
-	int start = GetIndex(polygons, Vector3<int>(10, 10, 0));
-	int goal = GetIndex(polygons, Vector3<int>(30, 120, 0));
-	auto&& path = routing_table.PathFind(polygons, start, goal);
-	path.Print();
-	
+	//int start = GetIndex(polygons, Vector3<int>(10, 10, 0));
+	////int goal = GetIndex(polygons, Vector3<int>(30, 120, 0));
+	//int goal = GetIndex(polygons, Vector3<int>(30, 10, 0));
+	//auto&& path = routing_table.PathFind(polygons, start, goal);
+	//path.Print();
+	auto start = std::chrono::system_clock::now();
+	for (int i = 0; i < 1000; i++) {
+		GetNextPos(routing_table, polygons, Vector3<int>(10, 10, 0), Vector3<int>(130, 60, 0));
+	}
+	auto end = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end - start;
+	float sec = elapsed_seconds.count();
+	std::cout << "Elapsed Time: " << sec << " sec/100000times" << std::endl;
 	return 0;
 }
