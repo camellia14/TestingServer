@@ -63,8 +63,6 @@ std::vector<int> indices = {
 	18, 19, 24,	//23
 	24, 23, 18,	//24
 };
-typedef Line Wall;
-typedef std::vector<Wall> Walls;
 
 class ConvexPolygon;
 
@@ -76,7 +74,7 @@ public:
 	class AdjacentData
 	{
 	public:
-		Wall wall;
+		Line portal;
 		ConvexPolygon* neighbour_polygon = nullptr;
 	};
 public:
@@ -107,7 +105,7 @@ public:
 		}
 		return false;
 	}
-	Line GetAdjacentWall(const ConvexPolygon& v)
+	Line GetAdjacentLine(const ConvexPolygon& v)
 	{
 		for (auto&& line : lines)
 		{
@@ -253,7 +251,7 @@ public:
 	}
 	void MakeUpAdjacentData(std::vector<ConvexPolygon>& polygons)
 	{
-		Walls walls;
+		std::vector<Line> portals;
 		for (auto&& polygon : polygons)
 		{
 			polygon.adjacents.clear();
@@ -263,19 +261,19 @@ public:
 				if (polygon.IsAdjacent(adjacent_polygon))
 				{
 					ConvexPolygon::AdjacentData adjacent;
-					adjacent.wall = std::move(polygon.GetAdjacentWall(adjacent_polygon));
+					adjacent.portal = std::move(polygon.GetAdjacentLine(adjacent_polygon));
 					adjacent.neighbour_polygon = &adjacent_polygon;
 					polygon.adjacents.emplace_back(adjacent);
-					walls.emplace_back(polygon.GetAdjacentWall(adjacent_polygon));
+					portals.emplace_back(polygon.GetAdjacentLine(adjacent_polygon));
 				}
 			}
 		}
 		for (auto&& polygon : polygons)
 		{
-			for (auto&& wall : walls)
+			for (auto&& portal : portals)
 			{
 				auto&& it = std::find_if(polygon.lines.begin(), polygon.lines.end(),
-					[search_line = wall](const Line& line) {
+					[search_line = portal](const Line& line) {
 						return (search_line[0] == line[0] && search_line[1] == line[1]) ||
 						(search_line[0] == line[1] && search_line[1] == line[0]);
 					});
@@ -412,7 +410,7 @@ static int GetIndex(const std::vector<ConvexPolygon>& polygons, const Vector3<in
 	return -1;
 }
 
-bool IsIntersectWalls(const Path& path, std::vector<ConvexPolygon>& polygons, const Line& line_to_goal)
+bool IsIntersectLines(const Path& path, std::vector<ConvexPolygon>& polygons, const Line& line_to_goal)
 {
 	for (int i = 0; i < polygons.size(); i++) {
 		for (auto&& line : polygons[i].lines) {
@@ -439,14 +437,14 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 	{
 		if (auto&& adjacent = polygons[path.indices[i]].GetAdjacent(path.indices[i + 1]))
 		{
-			right = adjacent->wall.vertices[0];
-			left = adjacent->wall.vertices[1];
+			right = adjacent->portal.vertices[0];
+			left = adjacent->portal.vertices[1];
 			Line right_line = Line(base, right);
 			Line left_line = Line(base, left);
 
 			// baseからright,leftにそれぞれ行けるか？
-			bool is_intersect_right = IsIntersectWalls(path, polygons, right_line);
-			bool is_intersect_left = IsIntersectWalls(path, polygons, left_line);
+			bool is_intersect_right = IsIntersectLines(path, polygons, right_line);
+			bool is_intersect_left = IsIntersectLines(path, polygons, left_line);
 			if (false == is_intersect_right && false == is_intersect_left)
 			{
 				// 行ける→次へ進む（prevをright, leftで更新）
@@ -457,13 +455,13 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 			{
 				// 右だけ行ける（左はprevを交点で更新）
 				prev_right = right;
-				Collision::IntersectLine(adjacent->wall, left_line);
+				Collision::IntersectLine(adjacent->portal, left_line);
 			}
 			else if (false == is_intersect_left && is_intersect_right)
 			{
 				// 左だけ行ける（右はprevを交点で更新）
 				prev_left = left;
-				Collision::IntersectLine(adjacent->wall, right_line);
+				Collision::IntersectLine(adjacent->portal, right_line);
 			}
 			else
 			{
@@ -483,7 +481,7 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 		}
 	}
 	// baseから直接goalに行ける？->終わり
-	if (false == IsIntersectWalls(path, polygons, Line(base, target_pos)))
+	if (false == IsIntersectLines(path, polygons, Line(base, target_pos)))
 	{
 		path.positions.emplace_back(target_pos);
 	}
@@ -527,7 +525,7 @@ int main()
 	}
 	auto end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
-	float sec = elapsed_seconds.count();
-	std::cout << "Elapsed Time: " << sec << " sec/100000times" << std::endl;
+	double sec = elapsed_seconds.count();
+	std::cout << "Elapsed Time: " << sec << " sec/1000times" << std::endl;
 	return 0;
 }
