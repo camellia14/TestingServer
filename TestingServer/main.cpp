@@ -284,6 +284,15 @@ public:
 			}
 		}
 	}
+	int GetIndex(const Vector3<int>& pos)
+	{
+		for (int i = 0; i < polygons.size(); i++) {
+			if (polygons[i].IsPointInPolygon(pos)) {
+				return i;
+			}
+		}
+		return -1;
+	}
 };
 
 class RoutingTable
@@ -400,16 +409,6 @@ public:
 	}
 };
 
-static int GetIndex(const std::vector<ConvexPolygon>& polygons, const Vector3<int>& pos)
-{
-	for (int i = 0; i < polygons.size(); i++) {
-		if (polygons[i].IsPointInPolygon(pos)) {
-			return i;
-		}
-	}
-	return -1;
-}
-
 bool IsIntersectLines(const Path& path, std::vector<ConvexPolygon>& polygons, const Line& line_to_goal)
 {
 	for (int i = 0; i < polygons.size(); i++) {
@@ -423,10 +422,10 @@ bool IsIntersectLines(const Path& path, std::vector<ConvexPolygon>& polygons, co
 	return false;
 }
 
-Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>& polygons, const Vector3<int>& current_pos, const Vector3<int>& target_pos)
+Vector3<int> GetNextPos(RoutingTable& routing_table, PolygonList& polygon_list, const Vector3<int>& current_pos, const Vector3<int>& target_pos)
 {
-	int start = GetIndex(polygons, current_pos);
-	int goal = GetIndex(polygons, target_pos);
+	int start = polygon_list.GetIndex(current_pos);
+	int goal = polygon_list.GetIndex(target_pos);
 	auto&& path = routing_table.GetPath(start, goal);
 	bool is_intersect = false;
 
@@ -435,7 +434,7 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 	Vector3<int> right, left, prev_right, prev_left;
 	for (int i = 0; i < path.indices.size() - 1; i++)
 	{
-		if (auto&& adjacent = polygons[path.indices[i]].GetAdjacent(path.indices[i + 1]))
+		if (auto&& adjacent = polygon_list.polygons[path.indices[i]].GetAdjacent(path.indices[i + 1]))
 		{
 			right = adjacent->portal.vertices[0];
 			left = adjacent->portal.vertices[1];
@@ -443,8 +442,8 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 			Line left_line = Line(base, left);
 
 			// baseからright,leftにそれぞれ行けるか？
-			bool is_intersect_right = IsIntersectLines(path, polygons, right_line);
-			bool is_intersect_left = IsIntersectLines(path, polygons, left_line);
+			bool is_intersect_right = IsIntersectLines(path, polygon_list.polygons, right_line);
+			bool is_intersect_left = IsIntersectLines(path, polygon_list.polygons, left_line);
 			if (false == is_intersect_right && false == is_intersect_left)
 			{
 				// 行ける→次へ進む（prevをright, leftで更新）
@@ -481,7 +480,7 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 		}
 	}
 	// baseから直接goalに行ける？->終わり
-	if (false == IsIntersectLines(path, polygons, Line(base, target_pos)))
+	if (false == IsIntersectLines(path, polygon_list.polygons, Line(base, target_pos)))
 	{
 		path.positions.emplace_back(target_pos);
 	}
@@ -496,18 +495,7 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, std::vector<ConvexPolygon>&
 		path.positions.emplace_back(left);
 		path.positions.emplace_back(target_pos);
 	}
-	//std::cout << "Path" << std::endl;
-	//for (auto&& pos : path.positions)
-	//{
-	//	std::cout << "(" << pos.x << ", " << pos.y << ")" << std::endl;
-	//}
 	return target_pos;
-}
-
-void OutputIndex(std::vector<ConvexPolygon>& polygons, const Vector3<int>& search_pos)
-{
-	int point_index = GetIndex(polygons, search_pos);
-	std::cout << "Pos(" << search_pos.x << "," << search_pos.y << ") point_index:" << point_index << std::endl;
 }
 
 int main()
@@ -520,12 +508,12 @@ int main()
 	auto&& routing_table = RoutingTable::Create(polygons);
 	//routing_table.Print();
 	auto start = std::chrono::system_clock::now();
-	for (int i = 0; i < 1000; i++) {
-		GetNextPos(routing_table, polygons.polygons, Vector3<int>(10, 10, 0), Vector3<int>(130, 60, 0));
+	for (int i = 0; i < 100000; i++) {
+		GetNextPos(routing_table, polygons, Vector3<int>(10, 10, 0), Vector3<int>(130, 60, 0));
 	}
 	auto end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	double sec = elapsed_seconds.count();
-	std::cout << "Elapsed Time: " << sec << " sec/1000times" << std::endl;
+	std::cout << "Elapsed Time: " << sec << " sec/100000times" << std::endl;
 	return 0;
 }
