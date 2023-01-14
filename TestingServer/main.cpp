@@ -453,14 +453,12 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, PolygonList& polygon_list, 
 			else if (is_intersect_left && false == is_intersect_right)
 			{
 				// 右だけ行ける（左はprevを交点で更新）
-				prev_right = right;
-				Collision::IntersectLine(adjacent->portal, left_line);
+				prev_right = Collision::IntersectLine(adjacent->portal, left_line);
 			}
 			else if (false == is_intersect_left && is_intersect_right)
 			{
 				// 左だけ行ける（右はprevを交点で更新）
-				prev_left = left;
-				Collision::IntersectLine(adjacent->portal, right_line);
+				prev_left = Collision::IntersectLine(adjacent->portal, right_line);
 			}
 			else
 			{
@@ -479,23 +477,25 @@ Vector3<int> GetNextPos(RoutingTable& routing_table, PolygonList& polygon_list, 
 			}
 		}
 	}
-	// baseから直接goalに行ける？->終わり
-	if (false == IsIntersectLines(path, polygon_list.polygons, Line(base, target_pos)))
+	// baseからgoalまで直行できない場合、左右どちらかの点を経由する。
+	if (IsIntersectLines(path, polygon_list.polygons, Line(base, target_pos)))
 	{
-		path.positions.emplace_back(target_pos);
+		// base-rightラインよりbase-goalラインの方が右なら右
+		if (Collision::OuterProduct(target_pos - base, right - base) > 0)
+		{
+			path.positions.emplace_back(right);
+		}
+		else
+		{
+			path.positions.emplace_back(left);
+		}
 	}
-	// base-rightラインよりbase-goalラインの方が右なら右
-	else if (Collision::OuterProduct(target_pos - base, right - base) > 0)
-	{
-		path.positions.emplace_back(right);
-		path.positions.emplace_back(target_pos);
-	}
-	else
-	{
-		path.positions.emplace_back(left);
-		path.positions.emplace_back(target_pos);
-	}
-	return target_pos;
+	path.positions.emplace_back(target_pos);
+	//for (auto&& pos : path.positions)
+	//{
+	//	std::cout << "(" << pos.x << "," << pos.y << ")" << std::endl;
+	//}
+	return path.positions[1];
 }
 
 int main()
